@@ -181,20 +181,24 @@ const updateClass = async (req, res) => {
 // @route   DELETE /api/classes/:id
 // @access  Private/Admin
 const deleteClass = async (req, res) => {
-  try {
-    const classItem = await Class.findById(req.params.id);
-
-    if (classItem) {
-      await classItem.remove();
-      res.json({ message: 'Class removed' });
-    } else {
-      res.status(404);
-      throw new Error('Class not found');
+    try {
+      // Find the document by ID and delete it in one step
+      const deletedClass = await Class.findByIdAndDelete(req.params.id);
+  
+      if (!deletedClass) {
+        // If findByIdAndDelete returns null, the document wasn't found
+        return res.status(404).json({ message: 'Class not found' });
+      }
+  
+      // If successful, deletedClass contains the document that was deleted
+      res.json({ message: 'Class removed successfully' }); // Indicate success
+  
+    } catch (error) {
+      // Catch any potential errors during the database operation
+      console.error('---> Error in deleteClass:', error);
+      res.status(500).json({ message: 'Server error during class deletion' });
     }
-  } catch (error) {
-    res.status(404).json({ message: error.message });
-  }
-};
+  };
 
 // @desc    Register for a class
 // @route   POST /api/classes/:id/register

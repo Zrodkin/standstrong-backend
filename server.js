@@ -16,13 +16,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  }));  
 app.use(morgan('dev'));
 
 // Routes (we'll add these later)
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/classes', require('./routes/classRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/cities', require('./routes/cityRoutes'));
+
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Basic route
 app.get('/', (req, res) => {

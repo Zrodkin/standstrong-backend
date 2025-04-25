@@ -1,23 +1,21 @@
 import multer from 'multer';
-import path from 'path'; // Import path as we might use it for checking extensions
+import path from 'path';
+import fs from 'fs'; // Needed to check and create folder if missing
 
 // Multer config: store images in /uploads and use a unique filename
 const storage = multer.diskStorage({
   destination(req, file, cb) {
-    // Ensure this 'uploads/' folder exists relative to your project root
-    // or where the Node.js process is started.
-    cb(null, 'uploads/');
+    const uploadPath = 'uploads/partner-logos/'; // <-- store all partner logos here
+    // Ensure the folder exists
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
   },
   filename(req, file, cb) {
-    // Create a unique filename to prevent overwrites
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    // Get the original file extension
     const extension = path.extname(file.originalname);
-    // Combine fieldname, unique suffix, and extension for the final name
-    // Using file.fieldname can be helpful if you have multiple upload fields
-    // cb(null, file.fieldname + '-' + uniqueSuffix + extension);
-    // Or simply use the unique suffix and original extension:
-    cb(null, 'file-' + uniqueSuffix + extension); // Example: file-1678886400000-123456789.png
+    cb(null, 'partner-' + uniqueSuffix + extension); // Example: partner-1678886400000-123456789.png
   }
 });
 

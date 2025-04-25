@@ -6,34 +6,38 @@ import User from '../models/User.js';   // Use import, add .js extension
 // @desc    Create a class
 // @route   POST /api/classes
 // @access  Private/Admin
-const createClass = async (req, res, next) => { // Added next
+const createClass = async (req, res, next) => {
   try {
-    // Destructure all expected fields from req.body for clarity
     const {
       title,
       description,
       city,
-      location, // Consider validating location structure { address, coordinates { lat, lng } }
-      instructor, // Consider validating instructor structure { name, bio }
-      type, // Validate against enum ['one-time', 'ongoing']
+      location,      // Should include only address
+      instructor,    // Should include name (bio optional)
+      type,          // "one-time" or "ongoing"
       cost,
-      targetGender, // Validate against enum ['any', 'male', 'female']
-      targetAgeRange, // Consider validating structure { min, max }
+      targetGender,
+      targetAgeRange,
       capacity,
-      schedule, // Consider validating schedule structure [{ date, startTime, endTime }]
+      schedule,
+      registrationType = 'internal', // Default to 'internal' if not sent
+      externalRegistrationLink = '',
+      partnerLogo = '',
     } = req.body;
 
-    // Basic validation example (add more specific checks as needed)
-    if (!title || !description || !city || !location?.address || !instructor?.name || !type || cost == null || !targetAgeRange?.min || !targetAgeRange?.max || !capacity || !schedule?.length) {
-        res.status(400); // Bad Request
-        throw new Error('Missing required class fields.');
+    // Basic validation
+    if (!title || !description || !city || !location?.address || !instructor?.name || !type || cost == null || !capacity || !schedule?.length) {
+      res.status(400);
+      throw new Error('Missing required class fields.');
     }
 
     const classItem = await Class.create({
       title,
       description,
       city,
-      location,
+      location: {
+        address: location.address, // Only address
+      },
       instructor,
       type,
       cost,
@@ -41,14 +45,16 @@ const createClass = async (req, res, next) => { // Added next
       targetAgeRange,
       capacity,
       schedule,
+      registrationType,
+      externalRegistrationLink,
+      partnerLogo,
     });
 
     res.status(201).json(classItem);
   } catch (error) {
-    next(error); // Pass error to global handler
+    next(error);
   }
 };
-
 // @desc    Get all classes with filtering
 // @route   GET /api/classes
 // @access  Public
@@ -137,24 +143,58 @@ const getClassById = async (req, res, next) => { // Added next
 // @desc    Update a class
 // @route   PUT /api/classes/:id
 // @access  Private/Admin
-const updateClass = async (req, res, next) => { // Added next
+const updateClass = async (req, res, next) => {
   try {
     const classItem = await Class.findById(req.params.id);
 
     if (!classItem) {
-      res.status(404); // Not Found
+      res.status(404);
       throw new Error('Class not found');
     }
 
-    // Update fields selectively based on request body
-    const updateData = req.body; // Assuming body contains fields to update
-    Object.assign(classItem, updateData); // Apply updates from body
+    const {
+      title,
+      description,
+      city,
+      location,
+      instructor,
+      type,
+      cost,
+      targetGender,
+      targetAgeRange,
+      capacity,
+      schedule,
+      registrationType,
+      externalRegistrationLink,
+      partnerLogo,
+    } = req.body;
 
-    const updatedClass = await classItem.save({ runValidators: true }); // Ensure validators run on update
+    // Only update if fields are provided
+    if (title !== undefined) classItem.title = title;
+    if (description !== undefined) classItem.description = description;
+    if (city !== undefined) classItem.city = city;
+    if (location?.address) classItem.location.address = location.address;
+    if (instructor) {
+      classItem.instructor.name = instructor.name || classItem.instructor.name;
+      classItem.instructor.bio = instructor.bio || classItem.instructor.bio;
+    }
+    if (type !== undefined) classItem.type = type;
+    if (cost !== undefined) classItem.cost = cost;
+    if (targetGender !== undefined) classItem.targetGender = targetGender;
+    if (targetAgeRange) {
+      if (targetAgeRange.min !== undefined) classItem.targetAgeRange.min = targetAgeRange.min;
+      if (targetAgeRange.max !== undefined) classItem.targetAgeRange.max = targetAgeRange.max;
+    }
+    if (capacity !== undefined) classItem.capacity = capacity;
+    if (schedule !== undefined) classItem.schedule = schedule;
+    if (registrationType !== undefined) classItem.registrationType = registrationType;
+    if (externalRegistrationLink !== undefined) classItem.externalRegistrationLink = externalRegistrationLink;
+    if (partnerLogo !== undefined) classItem.partnerLogo = partnerLogo;
+
+    const updatedClass = await classItem.save({ runValidators: true });
     res.json(updatedClass);
-
   } catch (error) {
-     next(error); // Pass error to global handler
+    next(error);
   }
 };
 

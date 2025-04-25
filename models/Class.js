@@ -21,10 +21,6 @@ const classSchema = new mongoose.Schema({
       type: String,
       required: true
     },
-    coordinates: {
-      lat: Number,
-      lng: Number
-    }
   },
   instructor: {
     name: {
@@ -35,7 +31,7 @@ const classSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['one-time', 'ongoing'],
+    enum: ['one-time', 'ongoing'], // Note: database values stay the same
     required: true
   },
   cost: {
@@ -54,8 +50,7 @@ const classSchema = new mongoose.Schema({
       required: true
     },
     max: {
-      type: Number,
-      required: true
+      type: Number, // Now NOT required — optional
     }
   },
   capacity: {
@@ -68,34 +63,47 @@ const classSchema = new mongoose.Schema({
       required: true
     },
     startTime: {
-      type: String, // Consider using Date/timestamps if precision or timezones matter
+      type: String,
       required: true
     },
     endTime: {
-      type: String, // Consider using Date/timestamps if precision or timezones matter
+      type: String,
       required: true
     }
   }],
   registeredStudents: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User' // Assumes User model is also converted/available
+      ref: 'User'
     },
     registeredAt: {
       type: Date,
       default: Date.now
     }
   }],
-  attendance: [{ // Note: You also have a separate Attendance model. Ensure consistency.
-    session: { // Might want to link this session date to a specific date in the 'schedule' array.
+  attendance: [{
+    session: {
       type: Date,
       required: true
     },
     presentStudents: [{
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User' // Assumes User model is also converted/available
+      ref: 'User'
     }]
   }],
+  // --- 🔥 NEW FIELDS BELOW 🔥 ---
+  registrationType: {
+    type: String,
+    enum: ['internal', 'external'],
+    default: 'internal'
+  },
+  externalRegistrationLink: {
+    type: String,
+  },
+  partnerLogo: {
+    type: String, // URL to the partner logo (optional, for display)
+  },
+  // --- 🔥 END NEW FIELDS ---
   createdAt: {
     type: Date,
     default: Date.now
@@ -106,4 +114,4 @@ const classSchema = new mongoose.Schema({
 
 const Class = mongoose.model('Class', classSchema);
 
-export default Class; // Use export default instead of module.exports
+export default Class;

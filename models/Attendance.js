@@ -1,5 +1,5 @@
 // frontend/models/Attendance.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'; // Use import instead of require
 
 const attendanceSchema = new mongoose.Schema({
   class: {
@@ -14,7 +14,7 @@ const attendanceSchema = new mongoose.Schema({
   attendees: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'User', // Make sure you have a User model defined and exported similarly
       required: true
     },
     checkInTime: {
@@ -36,4 +36,5 @@ const attendanceSchema = new mongoose.Schema({
 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
-module.exports = Attendance;
+
+export default Attendance; // Use export default instead of module.exports

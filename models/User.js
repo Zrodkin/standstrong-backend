@@ -1,6 +1,6 @@
 // frontend/models/User.js
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+import mongoose from 'mongoose'; // Use import
+import bcrypt from 'bcryptjs';   // Use import
 
 const userSchema = new mongoose.Schema({
   firstName: {
@@ -45,7 +45,7 @@ const userSchema = new mongoose.Schema({
   },
   registeredClasses: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Class'
+    ref: 'Class' // Assumes Class model is converted/available
   }],
   createdAt: {
     type: Date,
@@ -55,22 +55,27 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
+// Hash password before saving - NO CHANGES needed inside this function
 userSchema.pre('save', async function(next) {
+  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) {
     return next();
   }
-  
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error); // Pass errors to the next middleware
+  }
 });
 
-// Method to compare passwords
+// Method to compare passwords - NO CHANGES needed inside this function
 userSchema.methods.comparePassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 const User = mongoose.model('User', userSchema);
-module.exports = User;
 
+export default User; // Use export default

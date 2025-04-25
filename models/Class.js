@@ -1,5 +1,5 @@
 // server/models/Class.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'; // Use import instead of require
 
 const classSchema = new mongoose.Schema({
   title: {
@@ -68,32 +68,32 @@ const classSchema = new mongoose.Schema({
       required: true
     },
     startTime: {
-      type: String,
+      type: String, // Consider using Date/timestamps if precision or timezones matter
       required: true
     },
     endTime: {
-      type: String,
+      type: String, // Consider using Date/timestamps if precision or timezones matter
       required: true
     }
   }],
   registeredStudents: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'User' // Assumes User model is also converted/available
     },
     registeredAt: {
       type: Date,
       default: Date.now
     }
   }],
-  attendance: [{
-    session: {
+  attendance: [{ // Note: You also have a separate Attendance model. Ensure consistency.
+    session: { // Might want to link this session date to a specific date in the 'schedule' array.
       type: Date,
       required: true
     },
     presentStudents: [{
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'User' // Assumes User model is also converted/available
     }]
   }],
   createdAt: {
@@ -105,5 +105,5 @@ const classSchema = new mongoose.Schema({
 });
 
 const Class = mongoose.model('Class', classSchema);
-module.exports = Class;
 
+export default Class; // Use export default instead of module.exports

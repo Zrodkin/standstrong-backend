@@ -1,6 +1,7 @@
 // backend/controllers/userController.js
 import User from '../models/User.js';
 import generateToken from '../utils/generateToken.js';
+import Registration from '../models/Registration.js'; 
 // import asyncHandler from 'express-async-handler'; // Optional: if you use it
 
 // @desc    Register a new user
@@ -48,7 +49,6 @@ const registerUser = async (req, res, next) => {
         gender: user.gender,
         phone: user.phone,
         role: user.role,
-        registeredClasses: user.registeredClasses, // Include registered classes (IDs)
         token: generateToken(user._id),
       });
     } else {
@@ -92,7 +92,6 @@ const loginUser = async (req, res, next) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        registeredClasses: user.registeredClasses, // Include the array of class IDs
         token: generateToken(user._id),
       });
     } else {
@@ -131,7 +130,6 @@ const getUserProfile = async (req, res, next) => {
             gender: user.gender,
             phone: user.phone,
             role: user.role,
-            registeredClasses: user.registeredClasses, // Should now be an array of IDs
       });
     } else {
         console.log('User not found in getUserProfile.');
@@ -194,7 +192,6 @@ const updateUserProfile = async (req, res, next) => {
       gender: updatedUser.gender,
       phone: updatedUser.phone,
       role: updatedUser.role,
-      registeredClasses: updatedUser.registeredClasses, // Include registered classes
       token: generateToken(updatedUser._id),
     });
 
@@ -211,7 +208,6 @@ const getUsers = async (req, res, next) => {
     // Exclude passwords from the list of users
     const users = await User.find({})
                             .select('-password')
-                            .populate('registeredClasses', 'title city') // Populate basic class info for admin view
                             .sort({ createdAt: -1 });
 
     res.json(users);

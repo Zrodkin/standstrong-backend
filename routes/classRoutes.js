@@ -5,7 +5,6 @@ import {
   getClassById,
   updateClass,
   deleteClass,
-  registerForClass,
   getClassesByCity,
   getAllCities,
 } from '../controllers/classController.js'; // Use import, add .js extension
@@ -32,10 +31,6 @@ router.route('/:id')
   .get(getClassById);
 
 // --- Protected Class Routes (Requires login) ---
-
-// POST /api/classes/:id/register - Logged-in user registers for a specific class
-router.route('/:id/register')
-  .post(protect, registerForClass); // 'protect' ensures user is logged in
 
 // --- Admin Class Routes (Requires login and admin role) ---
 

@@ -71,16 +71,6 @@ const classSchema = new mongoose.Schema({
       required: true
     }
   }],
-  registeredStudents: [{
-    student: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    registeredAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
   attendance: [{
     session: {
       type: Date,

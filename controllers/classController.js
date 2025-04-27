@@ -151,10 +151,7 @@ const getClassById = async (req, res, next) => {
       throw new Error('Invalid class ID');
     }
 
-    const classItem = await Class.findById(id).populate({
-      path: 'registeredStudents.student',
-      select: 'firstName lastName email',
-    });
+    const classItem = await Class.findById(id);
 
     if (classItem) {
       res.json(classItem);
@@ -269,85 +266,11 @@ const deleteClass = async (req, res, next) => { // Added next
         throw new Error('Class not found');
       }
 
-      // Optional: Clean up references in User documents
-      await User.updateMany(
-        { registeredClasses: req.params.id },
-        { $pull: { registeredClasses: req.params.id } }
-      );
       // Optional: Delete related Attendance records
       // await Attendance.deleteMany({ class: req.params.id });
 
       res.json({ message: 'Class removed successfully' });
 
-    } catch (error) {
-      next(error); // Pass error to global handler
-    }
-  };
-
-// @desc    Register current user for a class
-// @route   POST /api/classes/:id/register
-// @access  Private
-const registerForClass = async (req, res, next) => { // Added next
-    try {
-      const classId = req.params.id;
-      const userId = req.user._id; // From 'protect' middleware
-
-      // Use Promise.all for concurrent database lookups
-      const [classItem, user] = await Promise.all([
-          Class.findById(classId),
-          User.findById(userId)
-      ]);
-
-      if (!classItem) {
-        res.status(404); // Not Found
-        throw new Error('Class not found');
-      }
-      if (!user) {
-          res.status(404); // Should not happen if 'protect' middleware is working, but good check
-          throw new Error('User not found');
-      }
-
-      // Check capacity
-      if (classItem.registeredStudents.length >= classItem.capacity) {
-        res.status(409); // Conflict (or 400 Bad Request)
-        throw new Error('Class is full');
-      }
-
-      // Check if user is already registered (using $elemMatch for efficiency if needed, but .some is fine)
-      const alreadyRegisteredClass = classItem.registeredStudents.some(
-        (reg) => reg.student.toString() === userId.toString()
-      );
-       const alreadyRegisteredUser = user.registeredClasses.some(
-           (id) => id.toString() === classId.toString()
-       );
-
-      if (alreadyRegisteredClass || alreadyRegisteredUser) {
-        // If one is true and not the other, indicates data inconsistency
-         if (alreadyRegisteredClass !== alreadyRegisteredUser) {
-             console.warn(`Data inconsistency: User ${userId} registration status differs for class ${classId}`);
-             // Potentially try to fix inconsistency here or just report error
-         }
-        res.status(409); // Conflict
-        throw new Error('User already registered for this class');
-      }
-
-      // Perform registration - update both documents
-      classItem.registeredStudents.push({ student: userId, registeredAt: new Date() });
-      user.registeredClasses.push(classId);
-
-      // Save both documents concurrently
-      await Promise.all([classItem.save(), user.save()]);
-
-      // Fetch updated user data with populated classes to return
-      // Select only the necessary fields to avoid sending sensitive info like password hash
-      const updatedUser = await User.findById(userId)
-                                    .populate('registeredClasses', 'title city schedule cost') // Populate needed class fields
-                                    .select('firstName lastName email age gender phone role registeredClasses');
-
-      res.status(201).json({
-        message: 'Successfully registered for class',
-        user: updatedUser // Return relevant updated user info
-      });
     } catch (error) {
       next(error); // Pass error to global handler
     }
@@ -399,7 +322,6 @@ export {
   getClassById,
   updateClass,
   deleteClass,
-  registerForClass,
   getClassesByCity, // <--- Added here
   getAllCities,
 };

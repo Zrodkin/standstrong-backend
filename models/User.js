@@ -43,10 +43,6 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'admin'],
     default: 'student'
   },
-  registeredClasses: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Class' // Assumes Class model is converted/available
-  }],
   createdAt: {
     type: Date,
     default: Date.now

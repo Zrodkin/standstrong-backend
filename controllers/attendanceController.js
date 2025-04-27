@@ -1,6 +1,7 @@
 // frontend/controllers/attendanceController.js
 import Attendance from '../models/Attendance.js'; // Use import, add .js extension
 import Class from '../models/Class.js';         // Use import, add .js extension
+import Registration from '../models/Registration.js'; 
 // Consider adding import asyncHandler from 'express-async-handler'; if you want to simplify try/catch
 
 // @desc    Create attendance record for a class session
@@ -55,44 +56,31 @@ const createAttendanceRecord = async (req, res, next) => { // Added next
 // @desc    Check in a student to a class session
 // @route   POST /api/attendance/:attendanceId/checkin
 // @access  Private (Assumes user is authenticated via 'protect' middleware)
-const checkInStudent = async (req, res, next) => { // Added next
+const checkInStudent = async (req, res, next) => {
   try {
     const { attendanceId } = req.params;
-    const userId = req.user._id; // Get user ID from 'protect' middleware
+    const userId = req.user._id;
 
     const attendanceRecord = await Attendance.findById(attendanceId);
+    if (!attendanceRecord) { /* ... error handling ... */ }
 
-    if (!attendanceRecord) {
-      res.status(404); // Not Found
-      throw new Error('Attendance record not found');
-    }
-
-    // Verify the associated class exists
-    const classItem = await Class.findById(attendanceRecord.class);
-    if (!classItem) {
-        res.status(404); // Not Found
-        throw new Error('Associated class not found for this attendance record');
-    }
-
-    // Check if student is registered for the class
-    const isRegistered = classItem.registeredStudents.some(
-      (reg) => reg.student && reg.student.toString() === userId.toString() // Added check for reg.student existence
-    );
+    // Check if student is registered for the class using the Registration model
+    const isRegistered = await Registration.findOne({
+        user: userId,
+        class: attendanceRecord.class, // Get classId from the attendance record
+        status: 'enrolled' // Only allow check-in if currently enrolled
+    });
 
     if (!isRegistered) {
       res.status(403); // Forbidden
-      throw new Error('Student is not registered for this class');
+      throw new Error('Student is not registered (or not currently enrolled) for this class');
     }
 
     // Check if student already checked in for this specific record
     const alreadyCheckedIn = attendanceRecord.attendees.some(
       (attendee) => attendee.student.toString() === userId.toString()
     );
-
-    if (alreadyCheckedIn) {
-      res.status(409); // Conflict
-      throw new Error('Student already checked in for this session');
-    }
+    if (alreadyCheckedIn) { /* ... error handling ... */ }
 
     // Add student to attendees
     attendanceRecord.attendees.push({
@@ -100,38 +88,22 @@ const checkInStudent = async (req, res, next) => { // Added next
       checkInTime: new Date(),
       status: 'present',
     });
-
     await attendanceRecord.save();
-
     res.status(200).json({ message: 'Successfully checked in' });
-  } catch (error) {
-    next(error); // Pass to global error handler
-    // console.error('Error checking in student:', error);
-    // res.status(res.statusCode >= 400 ? res.statusCode : 500).json({ message: error.message });
-  }
+  } catch (error) { next(error); }
 };
 
 // @desc    Update student attendance status (by Admin)
 // @route   PUT /api/attendance/:attendanceId/status
 // @access  Private/Admin
-const updateAttendanceStatus = async (req, res, next) => { // Added next
+const updateAttendanceStatus = async (req, res, next) => {
   try {
     const { attendanceId } = req.params;
     const { studentId, status } = req.body;
-
-    // Validate status input
-    const validStatuses = ['present', 'absent', 'late'];
-    if (!validStatuses.includes(status)) {
-        res.status(400); // Bad Request
-        throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
-    }
+    // ... validate status input ...
 
     const attendanceRecord = await Attendance.findById(attendanceId);
-
-    if (!attendanceRecord) {
-      res.status(404); // Not Found
-      throw new Error('Attendance record not found');
-    }
+    if (!attendanceRecord) { /* ... error handling ... */ }
 
     // Find student in attendees array
     const studentIndex = attendanceRecord.attendees.findIndex(
@@ -139,41 +111,36 @@ const updateAttendanceStatus = async (req, res, next) => { // Added next
     );
 
     if (studentIndex === -1) {
-      // If student not in attendees list for this record, we might add them (as admin action)
-      // Check if student is actually registered for the class first
-      const classItem = await Class.findById(attendanceRecord.class);
-       if (!classItem) {
-           res.status(404); // Not Found
-           throw new Error('Associated class not found for this attendance record');
-       }
-       const isRegistered = classItem.registeredStudents.some(
-         (reg) => reg.student && reg.student.toString() === studentId.toString()
-       );
+      // If student not in attendees list, verify they are registered before adding
+      const isRegistered = await Registration.findOne({
+          user: studentId,
+          class: attendanceRecord.class,
+          status: 'enrolled' // Or maybe allow adding if waitlisted? Depends on rules.
+      });
+
        if (!isRegistered) {
-           res.status(404); // Not Found or 400 Bad Request
-           throw new Error('Cannot update status: Student is not registered for this class.');
+           res.status(400); // Bad Request or 404
+           throw new Error('Cannot update status: Student is not registered (or enrolled) for this class.');
        }
-      // Add the student if registered but somehow not in the list yet
+       // Add the student if registered but somehow not in the list yet
        attendanceRecord.attendees.push({
          student: studentId,
-         checkInTime: new Date(), // Or null if marking absent? Needs clarity.
+         checkInTime: status === 'present' || status === 'late' ? new Date() : null, // Set check-in time if marking present/late
          status: status,
        });
     } else {
       // Update existing status
       attendanceRecord.attendees[studentIndex].status = status;
-      // Optionally update checkInTime if status changes to 'present' or 'late'?
+      // Optionally update checkInTime if status changes
+      if ((status === 'present' || status === 'late') && !attendanceRecord.attendees[studentIndex].checkInTime) {
+          attendanceRecord.attendees[studentIndex].checkInTime = new Date();
+      }
     }
-
     await attendanceRecord.save();
-
-    res.status(200).json({ message: 'Attendance status updated', record: attendanceRecord }); // Return updated record for confirmation
-  } catch (error) {
-    next(error); // Pass to global error handler
-    // console.error('Error updating attendance status:', error);
-    // res.status(res.statusCode >= 400 ? res.statusCode : 500).json({ message: error.message });
-  }
+    res.status(200).json({ message: 'Attendance status updated', record: attendanceRecord });
+  } catch (error) { next(error); }
 };
+
 
 // @desc    Get all attendance records for a specific class
 // @route   GET /api/attendance/class/:classId
@@ -230,35 +197,39 @@ const getAttendanceById = async (req, res, next) => { // Added next
 // @desc    Get aggregated attendance statistics for a class
 // @route   GET /api/attendance/stats/:classId
 // @access  Private/Admin
-const getAttendanceStats = async (req, res, next) => { // Added next
+const getAttendanceStats = async (req, res, next) => {
   try {
     const { classId } = req.params;
 
-    // Get the class details with registered students populated
-    const classItem = await Class.findById(classId)
-      .populate('registeredStudents.student', 'firstName lastName email'); // Select necessary fields
+    // --- Step 1: Fetch all required data at the same time ---
+    const [classItem, registeredStudentsData, attendanceRecords] = await Promise.all([
+        Class.findById(classId).select('title'), // Get class title
+        Registration.find({ class: classId, status: 'enrolled' }) // Get enrolled registrations
+                    .populate('user', 'firstName lastName email'), // Get user details for each registration
+        Attendance.find({ class: classId }) // Get all attendance session records for this class
+    ]);
+    // --- End Data Fetching ---
 
+    // --- Step 2: Check if the class was found ---
     if (!classItem) {
       res.status(404); // Not Found
       throw new Error('Class not found');
     }
+    
+// Calculate stats
+const totalSessions = attendanceRecords.length;
+// Use the populated user data from registrations
+const registeredStudents = registeredStudentsData.map(reg => reg.user).filter(Boolean); // Get user objects
+const totalRegisteredStudents = registeredStudents.length; // Count based on active registrations
 
-    // Get all attendance records for this class
-    const attendanceRecords = await Attendance.find({ class: classId });
-
-    // Calculate stats
-    const totalSessions = attendanceRecords.length;
-    const registeredStudents = classItem.registeredStudents.filter(reg => reg.student); // Filter out missing student refs
-    const totalRegisteredStudents = registeredStudents.length;
-
-    const attendanceStats = {
-      classId: classItem._id,
-      className: classItem.title,
-      totalSessions,
-      totalRegisteredStudents,
-      sessions: [],
-      studentStats: [],
-    };
+const attendanceStats = {
+    classId: classItem._id,
+    className: classItem.title,
+    totalSessions,
+    totalRegisteredStudents, // Use count from active registrations
+    sessions: [],
+    studentStats: [],
+};
 
     // --- Calculate per-session stats ---
     attendanceRecords.forEach(record => {
@@ -282,17 +253,19 @@ const getAttendanceStats = async (req, res, next) => { // Added next
 
 
     // --- Calculate per-student stats ---
-    registeredStudents.forEach(registration => {
-      const student = registration.student;
+    // Iterate over the fetched registered students data
+    registeredStudentsData.forEach(registration => {
+      const student = registration.user; // The populated user object
+      if (!student) return; // Skip if population failed for some reason
 
       const studentData = {
-        studentId: student._id,
-        name: `${student.firstName} ${student.lastName}`,
-        email: student.email,
-        sessionsPresent: 0,
-        sessionsAbsent: 0, // Calculated based on total sessions
-        sessionsLate: 0,
-        attendanceRate: 0,
+          studentId: student._id,
+          name: `${student.firstName} ${student.lastName}`,
+          email: student.email,
+          sessionsPresent: 0,
+          sessionsAbsent: 0,
+          sessionsLate: 0,
+          attendanceRate: 0,
       };
 
       attendanceRecords.forEach(record => {

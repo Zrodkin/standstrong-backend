@@ -19,6 +19,7 @@ import classRoutes from './routes/classRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import cityRoutes from './routes/cityRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import registrationRoutes from './routes/registrationRoutes.js';
 
 // Optional: Import custom error middleware if you create it
 // import { notFound, errorHandler } from './middleware/errorMiddleware.js';
@@ -57,6 +58,7 @@ const startServer = async () => {
     app.use('/api/attendance', attendanceRoutes);
     app.use('/api/cities', cityRoutes);
     app.use('/api/upload', uploadRoutes);
+    app.use('/api/registrations', registrationRoutes);
     // --- Static File Serving ---
     // Serve files from the 'uploads' directory
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

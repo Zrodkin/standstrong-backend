@@ -7,7 +7,12 @@ import User from '../models/User.js';   // Use import, add .js extension
 // @route   POST /api/classes
 // @access  Private/Admin
 const createClass = async (req, res, next) => {
+  // --- Log entry point and received data ---
+  console.log(`[Create Class] Received request.`);
+  console.log(`[Create Class] Request Body:`, req.body); // Log the entire request body
+
   try {
+    // Destructure fields from request body
     const {
       title,
       description,
@@ -22,15 +27,21 @@ const createClass = async (req, res, next) => {
       schedule,
       registrationType = 'internal', // Default to 'internal' if not sent
       externalRegistrationLink = '',
-      partnerLogo = '',
+      partnerLogo = '', // Default to empty string if not sent
     } = req.body;
 
-    // Basic validation
+    // --- Basic validation ---
+    // (Keep your existing validation)
     if (!title || !description || !city || !location?.address || !instructor?.name || !type || cost == null || !capacity || !schedule?.length) {
+      console.log(`[Create Class] Validation failed: Missing required fields.`); // Log validation failure
       res.status(400);
       throw new Error('Missing required class fields.');
     }
 
+     // --- Log the partnerLogo value *before* creating ---
+     console.log(`[Create Class] Value for partnerLogo being passed to Class.create: "${partnerLogo}"`);
+
+    // Create the new class document
     const classItem = await Class.create({
       title,
       description,
@@ -47,14 +58,23 @@ const createClass = async (req, res, next) => {
       schedule,
       registrationType,
       externalRegistrationLink,
-      partnerLogo,
+      partnerLogo, // Pass the destructured value (which might be '' or the path)
     });
 
+    // --- Log success and the created item ---
+    console.log(`[Create Class] Class created successfully with ID: ${classItem._id}`);
+    console.log(`[Create Class] Created class data:`, JSON.stringify(classItem.toObject(), null, 2)); // Log the full created object
+
     res.status(201).json(classItem);
+
   } catch (error) {
-    next(error);
+    // --- Log any errors that occur ---
+    console.error(`[Create Class] Error creating class: ${error.message}`);
+    console.error(error.stack); // Log stack trace
+    next(error); // Pass error to the global error handler
   }
 };
+
 // @desc    Get all classes with filtering
 // @route   GET /api/classes
 // @access  Public
@@ -144,14 +164,20 @@ const getClassById = async (req, res, next) => { // Added next
 // @route   PUT /api/classes/:id
 // @access  Private/Admin
 const updateClass = async (req, res, next) => {
+  // --- Log entry point and received data ---
+  console.log(`[Update Class ${req.params.id}] Received request.`);
+  console.log(`[Update Class ${req.params.id}] Request Body:`, req.body); // Log the entire request body
+
   try {
     const classItem = await Class.findById(req.params.id);
 
     if (!classItem) {
+      console.log(`[Update Class ${req.params.id}] Error: Class not found.`); // Log not found error
       res.status(404);
       throw new Error('Class not found');
     }
 
+    // Destructure fields from request body
     const {
       title,
       description,
@@ -166,35 +192,60 @@ const updateClass = async (req, res, next) => {
       schedule,
       registrationType,
       externalRegistrationLink,
-      partnerLogo,
+      partnerLogo, // The field we are interested in
     } = req.body;
 
-    // Only update if fields are provided
+    // --- Update fields only if they are provided in the request ---
     if (title !== undefined) classItem.title = title;
     if (description !== undefined) classItem.description = description;
     if (city !== undefined) classItem.city = city;
     if (location?.address) classItem.location.address = location.address;
     if (instructor) {
-      classItem.instructor.name = instructor.name || classItem.instructor.name;
-      classItem.instructor.bio = instructor.bio || classItem.instructor.bio;
+      classItem.instructor.name = instructor.name !== undefined ? instructor.name : classItem.instructor.name;
+      classItem.instructor.bio = instructor.bio !== undefined ? instructor.bio : classItem.instructor.bio;
     }
     if (type !== undefined) classItem.type = type;
     if (cost !== undefined) classItem.cost = cost;
     if (targetGender !== undefined) classItem.targetGender = targetGender;
     if (targetAgeRange) {
       if (targetAgeRange.min !== undefined) classItem.targetAgeRange.min = targetAgeRange.min;
-      if (targetAgeRange.max !== undefined) classItem.targetAgeRange.max = targetAgeRange.max;
+       // Check if max is explicitly sent (even if empty string) vs not sent at all (undefined)
+      if (targetAgeRange.max !== undefined) {
+         // Allow setting max age to null/empty if an empty string is sent
+         classItem.targetAgeRange.max = targetAgeRange.max === '' ? null : targetAgeRange.max;
+      }
     }
     if (capacity !== undefined) classItem.capacity = capacity;
     if (schedule !== undefined) classItem.schedule = schedule;
     if (registrationType !== undefined) classItem.registrationType = registrationType;
+    // Allow clearing the external link if an empty string is sent
     if (externalRegistrationLink !== undefined) classItem.externalRegistrationLink = externalRegistrationLink;
-    if (partnerLogo !== undefined) classItem.partnerLogo = partnerLogo;
 
+    // --- Specific logging for partnerLogo ---
+    if (partnerLogo !== undefined) {
+      // This means the partnerLogo field was present in the request body
+      classItem.partnerLogo = partnerLogo; // Assign the value from req.body
+      console.log(`[Update Class ${req.params.id}] Assigning partnerLogo from request: "${partnerLogo}"`);
+    } else {
+      // This means the partnerLogo field was NOT present in the request body
+      console.log(`[Update Class ${req.params.id}] partnerLogo field was NOT provided in the request body. Current value remains: "${classItem.partnerLogo}"`);
+    }
+
+    // --- Log the state *before* saving ---
+    console.log(`[Update Class ${req.params.id}] Class data BEFORE save:`, JSON.stringify(classItem.toObject(), null, 2)); // Use .toObject() for cleaner logging
+
+    // Save the updated document
     const updatedClass = await classItem.save({ runValidators: true });
+
+    // --- Log success ---
+    console.log(`[Update Class ${req.params.id}] Class saved successfully.`);
     res.json(updatedClass);
+
   } catch (error) {
-    next(error);
+    // --- Log any errors that occur ---
+    console.error(`[Update Class ${req.params.id}] Error saving class: ${error.message}`);
+    console.error(error.stack); // Log the stack trace for more details
+    next(error); // Pass error to the global error handler
   }
 };
 

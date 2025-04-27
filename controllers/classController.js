@@ -1,6 +1,7 @@
 // server/controllers/classController.js
 import Class from '../models/Class.js'; // Use import, add .js extension
 import User from '../models/User.js';   // Use import, add .js extension
+import mongoose from 'mongoose'; 
 // Removed erroneous top-level line: const updatedUser = await User.findById(req.user._id)...
 
 // @desc    Create a class
@@ -141,22 +142,28 @@ const getClasses = async (req, res, next) => { // Added next
 // @desc    Get a single class by ID
 // @route   GET /api/classes/:id
 // @access  Public
-const getClassById = async (req, res, next) => { // Added next
+const getClassById = async (req, res, next) => {
   try {
-    // Populate student details for display if needed
-    const classItem = await Class.findById(req.params.id).populate({
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400);
+      throw new Error('Invalid class ID');
+    }
+
+    const classItem = await Class.findById(id).populate({
       path: 'registeredStudents.student',
-      select: 'firstName lastName email', // Select only needed fields
+      select: 'firstName lastName email',
     });
 
     if (classItem) {
       res.json(classItem);
     } else {
-      res.status(404); // Not Found
+      res.status(404);
       throw new Error('Class not found');
     }
   } catch (error) {
-     next(error); // Pass error to global handler
+    next(error);
   }
 };
 

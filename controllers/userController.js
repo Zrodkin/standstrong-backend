@@ -216,6 +216,189 @@ const getUsers = async (req, res, next) => {
   }
 };
 
+// Add this new controller function to handle filtered requests
+const getFilteredUsers = async (req, res, next) => {
+  try {
+    const { 
+      search,
+      branch,
+      status,
+      enrollmentStatus,
+      tags,
+      page = 1,
+      limit = 10,
+      sort = 'lastName',
+      direction = 'asc'
+    } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build the query
+    const query = {};
+
+    // Search filter
+    if (search) {
+      const searchPattern = new RegExp(search, 'i');
+      query.$or = [
+        { firstName: searchPattern },
+        { lastName: searchPattern },
+        { email: searchPattern },
+        { phone: searchPattern }
+      ];
+    }
+
+    // Branch/location filter
+    if (branch && branch !== 'all') {
+      query.city = branch;
+    }
+
+    // Status filter
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Create sort object
+    const sortObj = {};
+    sortObj[sort] = direction === 'desc' ? -1 : 1;
+
+    // Get users with pagination
+    const users = await User.find(query)
+      .select('-password')
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limitNum);
+
+    // Count total users
+    const total = await User.countDocuments(query);
+
+    // Enhanced user data with enrollments
+    const enhancedUsers = await Promise.all(users.map(async (user) => {
+      // Get user's registrations
+      const registrations = await Registration.find({ user: user._id })
+        .populate('class', 'title schedule city');
+      
+      return {
+        ...user.toObject(),
+        enrollments: registrations.map(reg => ({
+          _id: reg._id,
+          classId: reg.class._id,
+          className: reg.class.title,
+          city: reg.class.city,
+          status: reg.status,
+          registrationDate: reg.registrationDate
+        }))
+      };
+    }));
+
+    // Send paginated response
+    res.json({
+      users: enhancedUsers,
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+const exportStudents = async (req, res, next) => {
+  try {
+    const { 
+      search,
+      branch,
+      status,
+      enrollmentStatus,
+      tags
+    } = req.query;
+
+    // Build the query
+    const query = {};
+
+    // Search filter
+    if (search) {
+      const searchPattern = new RegExp(search, 'i');
+      query.$or = [
+        { firstName: searchPattern },
+        { lastName: searchPattern },
+        { email: searchPattern },
+        { phone: searchPattern }
+      ];
+    }
+
+    // Branch/location filter
+    if (branch && branch !== 'all') {
+      query.city = branch;
+    }
+
+    // Status filter
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Get all users matching the query without pagination
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ lastName: 1, firstName: 1 });
+
+    // Enhanced user data with enrollments
+    const enhancedUsers = await Promise.all(users.map(async (user) => {
+      // Get user's registrations
+      const registrations = await Registration.find({ user: user._id })
+        .populate('class', 'title schedule city');
+      
+      return {
+        ...user.toObject(),
+        enrollments: registrations.map(reg => ({
+          classId: reg.class._id,
+          className: reg.class.title,
+          city: reg.class.city,
+          status: reg.status,
+          registrationDate: reg.registrationDate
+        }))
+      };
+    }));
+
+    // Format data for export (CSV format)
+    // Set headers for file download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="students-export.csv"');
+
+    // CSV header
+    let csvContent = 'First Name,Last Name,Email,Phone,Age,Gender,Location,Status,Join Date,Classes Enrolled\n';
+
+    // Add data rows
+    enhancedUsers.forEach(user => {
+      const joinDate = new Date(user.createdAt).toLocaleDateString();
+      const classesEnrolled = user.enrollments ? user.enrollments.length : 0;
+      
+      // Escape fields to handle commas in data
+      const row = [
+        user.firstName?.replace(/,/g, ' ') || '',
+        user.lastName?.replace(/,/g, ' ') || '',
+        user.email?.replace(/,/g, ' ') || '',
+        user.phone?.replace(/,/g, ' ') || '',
+        user.age || '',
+        user.gender || '',
+        user.city?.replace(/,/g, ' ') || '',
+        user.status || 'active',
+        joinDate,
+        classesEnrolled
+      ];
+      
+      csvContent += row.join(',') + '\n';
+    });
+
+    // Send CSV data
+    res.send(csvContent);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Export all controller functions using named exports
 export {
   registerUser,
@@ -223,4 +406,6 @@ export {
   getUserProfile,
   updateUserProfile,
   getUsers,
+  getFilteredUsers,
+  exportStudents
 };

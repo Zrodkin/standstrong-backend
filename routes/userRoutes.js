@@ -5,6 +5,8 @@ import {
   getUserProfile,
   updateUserProfile,
   getUsers,
+  getFilteredUsers,
+  exportStudents
 } from '../controllers/userController.js'; // Use import, add .js extension
 import { protect, admin } from '../middleware/authMiddleware.js'; // Use import, add .js extension
 
@@ -31,5 +33,12 @@ router.route('/profile')
 // GET /api/users - Get a list of all users (admin only)
 router.route('/')
   .get(protect, admin, getUsers); // 'protect' & 'admin' ensure user is admin
+
+// Add the new route for filtered users
+router.route('/admin')
+  .get(protect, admin, getFilteredUsers);
+
+  router.route('/export')
+  .get(protect, admin, exportStudents);
 
 export default router; // Use export default

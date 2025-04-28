@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv'; // For environment variables like NODE_ENV, PORT, JWT_SECRET
 import path from 'path';     // Node.js path module
 import { fileURLToPath } from 'url'; // To get __dirname in ESM
+import fs from 'fs';       // For file system operations
 
 // --- Load Environment Variables ---
 // Needs 'dotenv' package: npm install dotenv
@@ -61,7 +62,29 @@ const startServer = async () => {
     app.use('/api/registrations', registrationRoutes);
     // --- Static File Serving ---
     // Serve files from the 'uploads' directory
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+    const uploadsPath = path.join(__dirname, 'uploads');
+console.log('Serving static files from:', uploadsPath);
+
+// Ensure the uploads directory exists
+try {
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log(`Created uploads directory: ${uploadsPath}`);
+  }
+} catch (error) {
+  console.error('Error with uploads directory:', error);
+}
+
+// Serve files with proper CORS settings
+app.use('/uploads', 
+  express.static(uploadsPath, { 
+    setHeaders: (res) => {
+      // Allow cross-origin access to the files
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+  })
+);
 
     // --- Basic Root Route ---
     app.get('/', (req, res) => {

@@ -2,6 +2,7 @@
 import Class from '../models/Class.js'; // Use import, add .js extension
 import User from '../models/User.js';   // Use import, add .js extension
 import mongoose from 'mongoose'; 
+import Registration from '../models/Registration.js';
 // Removed erroneous top-level line: const updatedUser = await User.findById(req.user._id)...
 
 // @desc    Create a class
@@ -79,66 +80,123 @@ const createClass = async (req, res, next) => {
 // @desc    Get all classes with filtering
 // @route   GET /api/classes
 // @access  Public
-const getClasses = async (req, res, next) => { // Added next
+const getClasses = async (req, res, next) => {
   try {
     const { city, gender, minAge, maxAge, cost, type, time } = req.query;
 
-    // Build filter object for MongoDB query
-    const filter = {};
-
+    // --- 1. Build the initial $match stage for filtering classes ---
+    const matchFilter = {};
     if (city) {
-      // Case-insensitive city search
-      filter.city = new RegExp(`^${city}$`, 'i');
+      matchFilter.city = new RegExp(`^${city}$`, 'i');
     }
-
-    if (gender && gender !== 'any') { // Exclude 'any' from direct filter if sent
-      filter.targetGender = { $in: [gender, 'any'] };
+    if (gender && gender !== 'any') {
+      matchFilter.targetGender = { $in: [gender, 'any'] };
     }
-
-    // Age range filtering (check overlap)
     if (minAge || maxAge) {
-      filter['targetAgeRange.min'] = { $lte: maxAge ? Number(maxAge) : 100 }; // Class min age <= query max age
-      filter['targetAgeRange.max'] = { $gte: minAge ? Number(minAge) : 0 };   // Class max age >= query min age
+      matchFilter['targetAgeRange.min'] = { $lte: maxAge ? Number(maxAge) : 100 };
+      matchFilter['targetAgeRange.max'] = { $gte: minAge ? Number(minAge) : 0 };
     }
-
-    if (cost != null) { // Check for null/undefined explicitly
-      filter.cost = { $lte: Number(cost) };
+    if (cost != null) {
+      matchFilter.cost = { $lte: Number(cost) };
     }
-
     if (type) {
-      filter.type = type;
+      matchFilter.type = type;
     }
+    // Note: Time filtering remains complex if stored as strings. Applied after aggregation.
 
-    // Fetch classes based on database filters
-    // Only populate necessary fields
-    let classes = await Class.find(filter)
-                               .select('-registeredStudents -attendance') // Exclude bulky fields from list view
-                               .sort({ createdAt: -1 }); // Sort by creation date, newest first
+    // --- 2. Define the Aggregation Pipeline ---
+    const pipeline = [
+      // Stage 1: Match classes based on filters
+      { $match: matchFilter },
 
-    // Filter by time (in memory - consider DB aggregation for performance on large datasets)
+      // Stage 2: Lookup registrations for each matched class
+      {
+        $lookup: {
+          from: Registration.collection.name, // The name of the registrations collection
+          localField: '_id',                 // Field from the Class collection (input)
+          foreignField: 'class',             // Field from the Registration collection
+          as: 'registrations'              // Name of the new array field to add
+        }
+      },
+
+      // Stage 3: Add the enrollmentCount field
+      {
+        $addFields: {
+          enrollmentCount: {
+            $size: {
+              // Filter the registrations array
+              $filter: {
+                input: '$registrations',
+                as: 'reg',
+                // Keep only registrations with these statuses
+                cond: { $in: ['$$reg.status', ['enrolled', 'waitlisted']] }
+              }
+            }
+          }
+        }
+      },
+
+       // Stage 4: Project the desired fields (clean up output)
+       {
+        $project: {
+          _id: 1,
+          title: 1,
+          city: 1,
+          instructor: 1,
+          type: 1,
+          capacity: 1,
+          schedule: 1,
+          createdAt: 1,
+          enrollmentCount: 1,
+          description: 1,
+          location: 1,
+          cost: 1,
+          targetGender: 1,
+          targetAgeRange: 1, // The calculated count we added
+
+          // --- Other fields from Class.js (Uncomment if needed elsewhere on page) ---
+          // registrationType: 1,
+          // externalRegistrationLink: 1,
+          // partnerLogo: 1,
+        }
+      },
+
+      // Stage 5: Sort the results
+      { $sort: { createdAt: -1 } } // Or sort by another field if preferred
+    ];
+
+    // --- 3. Execute the Aggregation Pipeline ---
+    let classes = await Class.aggregate(pipeline);
+
+    // --- 4. Apply Time Filtering (In-Memory, as before) ---
     if (time) {
       classes = classes.filter(classItem => {
+         // Ensure schedule exists and has items
+         if (!classItem.schedule || classItem.schedule.length === 0) return false;
+
         return classItem.schedule.some(session => {
-          if (!session.startTime || !session.startTime.includes(':')) return false; // Basic check for valid time string
+          if (!session.startTime || !session.startTime.includes(':')) return false;
           const startHour = parseInt(session.startTime.split(':')[0], 10);
           if (isNaN(startHour)) return false;
 
           switch (time.toLowerCase()) {
             case 'morning': return startHour >= 6 && startHour < 12;
             case 'afternoon': return startHour >= 12 && startHour < 17;
-            case 'evening': return startHour >= 17 || startHour < 6; // Handles evening wraps past midnight conceptually
+            case 'evening': return startHour >= 17 || startHour < 6;
             default: return false;
           }
         });
       });
     }
 
+    // --- 5. Send Response ---
     res.json(classes);
+
   } catch (error) {
-    next(error); // Pass error to global handler
+    console.error("Error fetching classes with aggregation:", error); // Add detailed logging
+    next(error);
   }
 };
-
 // @desc    Get a single class by ID
 // @route   GET /api/classes/:id
 // @access  Public

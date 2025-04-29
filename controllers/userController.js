@@ -9,12 +9,12 @@ import Registration from '../models/Registration.js';
 // @access  Public
 const registerUser = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, age, gender, phone } = req.body;
+    const { firstName, lastName, email, password, age, gender, phone, city } = req.body;
 
     // Basic validation
-    if (!firstName || !lastName || !email || !password || !age || !gender) {
+    if (!firstName || !lastName || !email || !password || !age || !gender || !city) {
         res.status(400); // Bad Request
-        throw new Error('Please provide firstName, lastName, email, password, age, and gender');
+        throw new Error('Please provide firstName, lastName, email, password, age, gender, and city');
     }
      if (password.length < 6) {
          res.status(400); // Bad Request
@@ -35,7 +35,8 @@ const registerUser = async (req, res, next) => {
       password, // Hashing happens in User model pre-save hook
       age,
       gender,
-      phone: phone || null
+      phone: phone || null,
+      city,
     });
 
     if (user) {
@@ -48,9 +49,10 @@ const registerUser = async (req, res, next) => {
         age: user.age,
         gender: user.gender,
         phone: user.phone,
+        city: user.city,
         role: user.role,
         token: generateToken(user._id),
-      });
+      })
     } else {
       res.status(400); // Bad Request
       throw new Error('Invalid user data');

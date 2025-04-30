@@ -29,7 +29,8 @@ const createClass = async (req, res, next) => {
       schedule,
       registrationType = 'internal', // Default to 'internal' if not sent
       externalRegistrationLink = '',
-      partnerLogo = '', // Default to empty string if not sent
+      partnerLogo = '',
+      imageUrl = '', // Default to empty string if not sent
     } = req.body;
 
     // --- Basic validation ---
@@ -42,6 +43,7 @@ const createClass = async (req, res, next) => {
 
      // --- Log the partnerLogo value *before* creating ---
      console.log(`[Create Class] Value for partnerLogo being passed to Class.create: "${partnerLogo}"`);
+     console.log(`[Create Class] Value for imageUrl being passed: "${imageUrl}"`);
 
     // Create the new class document
     const classItem = await Class.create({
@@ -61,6 +63,7 @@ const createClass = async (req, res, next) => {
       registrationType,
       externalRegistrationLink,
       partnerLogo, // Pass the destructured value (which might be '' or the path)
+      imageUrl,
     });
 
     // --- Log success and the created item ---
@@ -153,7 +156,10 @@ const getClasses = async (req, res, next) => {
           cost: 1,
           targetGender: 1,
           targetAgeRange: 1, // The calculated count we added
-
+          imageUrl: 1,           // Add this line
+          partnerLogo: 1,        // Add this line
+          registrationType: 1,   // Uncomment this
+          externalRegistrationLink: 1
           // --- Other fields from Class.js (Uncomment if needed elsewhere on page) ---
           // registrationType: 1,
           // externalRegistrationLink: 1,
@@ -209,9 +215,14 @@ const getClassById = async (req, res, next) => {
       throw new Error('Invalid class ID');
     }
 
-    const classItem = await Class.findById(id);
+    const classItem = await Class.findById(id)
+      .populate('instructor')
+      .populate('city');
+      // No need to use .select() since we want all fields including imageUrl and partnerLogo
 
     if (classItem) {
+      console.log("Class imageUrl:", classItem.imageUrl); // Add this log to debug
+      console.log("Class partnerLogo:", classItem.partnerLogo); // Add this log to debug
       res.json(classItem);
     } else {
       res.status(404);
@@ -254,7 +265,8 @@ const updateClass = async (req, res, next) => {
       schedule,
       registrationType,
       externalRegistrationLink,
-      partnerLogo, // The field we are interested in
+      partnerLogo,
+      imageUrl,
     } = req.body;
 
     // --- Update fields only if they are provided in the request ---
@@ -291,6 +303,10 @@ const updateClass = async (req, res, next) => {
     } else {
       // This means the partnerLogo field was NOT present in the request body
       console.log(`[Update Class ${req.params.id}] partnerLogo field was NOT provided in the request body. Current value remains: "${classItem.partnerLogo}"`);
+    }
+    if (imageUrl !== undefined) {
+      classItem.imageUrl = imageUrl; // Assign the value from req.body
+      console.log(`[Update Class ${req.params.id}] Assigning imageUrl from request: "${imageUrl}"`);
     }
 
     // --- Log the state *before* saving ---

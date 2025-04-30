@@ -16,6 +16,11 @@ const classSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+
+  imageUrl: {
+    type: String, // URL to the class image
+  },
+
   location: {
     address: {
       type: String,

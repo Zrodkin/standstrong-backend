@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename); // Should resolve to /path/to/projec
 // Then into 'uploads' and 'partner-logos'.
 // This ensures the path is correct regardless of where the node process is started.
 const partnerLogosUploadPath = path.join(__dirname, '..', 'uploads', 'partner-logos');
-
+const classImagesUploadPath = path.join(__dirname, '..', 'uploads', 'class-images');
 // --- Ensure Upload Directory Exists ---
 // It's good practice to ensure the directory exists when the module loads.
 try {
@@ -29,21 +29,35 @@ try {
   // Consider if the application should exit if uploads are essential and the dir fails
   // process.exit(1);
 }
-
+try {
+  if (!fs.existsSync(classImagesUploadPath)) {
+    fs.mkdirSync(classImagesUploadPath, { recursive: true });
+    console.log(`Upload directory created: ${classImagesUploadPath}`);
+  }
+} catch (error) {
+  console.error(`FATAL: Could not create upload directory ${classImagesUploadPath}. Check permissions.`, error);
+}
 
 // --- Multer Storage Configuration ---
 const storage = multer.diskStorage({
   destination(req, file, cb) {
-    // Use the pre-calculated absolute path for reliability
-    cb(null, partnerLogosUploadPath);
+    // Determine the appropriate upload path based on the request
+    const uploadType = req.query.type || 'logo'; // Default to logo for backward compatibility
+    const uploadPath = uploadType === 'image' ? classImagesUploadPath : partnerLogosUploadPath;
+    
+    console.log(`Uploading file to: ${uploadPath}, type: ${uploadType}`);
+    cb(null, uploadPath);
   },
   filename(req, file, cb) {
     // Generate a unique filename while preserving the original extension
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    // path.extname() correctly extracts '.png', '.jpg', etc.
     const extension = path.extname(file.originalname);
-    // Callback with the generated filename (e.g., partner-1678886400000-123456789.png)
-    cb(null, 'partner-' + uniqueSuffix + extension);
+    
+    // Use different prefixes based on upload type
+    const uploadType = req.query.type || 'logo';
+    const prefix = uploadType === 'image' ? 'class-' : 'partner-';
+    
+    cb(null, prefix + uniqueSuffix + extension);
   }
 });
 

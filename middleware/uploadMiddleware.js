@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs'; // Needed to check and create folder if missing
 import { fileURLToPath } from 'url'; // To get __dirname in ESM
+import sharp from 'sharp'; // Add this import
 
 // --- Define __dirname for ESM ---
 // This provides the absolute path to the directory containing this file (uploadMiddleware.js)
@@ -65,7 +66,7 @@ const storage = multer.diskStorage({
 // Checks both extension and MIME type for allowed image formats
 function checkFileType(file, cb) {
   // Define allowed file extensions (regex, case-insensitive)
-  const filetypes = /jpeg|jpg|png|gif/;
+  const filetypes = /jpeg|jpg|png|gif|webp/;
   // Check the file extension (using path.extname and converting to lowercase)
   const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
   // Check the MIME type provided by the browser/client
@@ -80,9 +81,37 @@ function checkFileType(file, cb) {
   } else {
     // File type is not allowed - pass an error back to Multer.
     // This error can be caught by the error handler in uploadRoutes.js
-    cb(new Error('Error: Images Only! (jpeg, jpg, png, gif)'), false);
+    cb(new Error('Error: Images Only! (jpeg, jpg, png, gif, webp)'), false);
   }
 }
+
+// --- Add this new function for WebP processing ---
+const processAndSaveImage = async (file) => {
+  const originalPath = file.path;
+  const webpPath = originalPath.replace(path.extname(originalPath), '.webp');
+  
+  try {
+    // Create WebP version
+    await sharp(originalPath)
+      .webp({ quality: 80 })
+      .toFile(webpPath);
+    
+    console.log(`WebP version created: ${webpPath}`);
+    
+    // Return both paths
+    return {
+      original: originalPath,
+      webp: webpPath
+    };
+  } catch (error) {
+    console.error(`Failed to create WebP version: ${error.message}`);
+    // If WebP creation fails, just return the original
+    return {
+      original: originalPath,
+      webp: null
+    };
+  }
+};
 
 // --- Configure Multer Instance ---
 const upload = multer({
@@ -94,7 +123,11 @@ const upload = multer({
     // Apply the custom file filter function for each file
     checkFileType(file, cb);
   }
+  
 });
+
+
 
 // Export the configured Multer middleware for use in routes
 export default upload;
+export { processAndSaveImage };

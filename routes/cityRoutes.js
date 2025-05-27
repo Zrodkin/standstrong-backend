@@ -1,6 +1,5 @@
 import express from 'express'; // Use import
 import City from '../models/City.js'; // Use import, add .js extension
-import upload from '../middleware/uploadMiddleware.js'; // Use import, add .js extension
 import { protect, admin } from '../middleware/authMiddleware.js'; // Use import, add .js extension
 
 const router = express.Router();

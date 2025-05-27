@@ -44,31 +44,7 @@ const startServer = async () => {
         app.use(morgan('dev'));
     }
 
-    // --- Static File Serving Setup ---
-    const uploadsPath = path.join(__dirname, 'uploads');
-    console.log('Serving static files from:', uploadsPath);
 
-    // Ensure the uploads directory exists
-    try {
-      if (!fs.existsSync(uploadsPath)) {
-        fs.mkdirSync(uploadsPath, { recursive: true });
-        console.log(`Created uploads directory: ${uploadsPath}`);
-      }
-    } catch (error) {
-      console.error('Error with uploads directory:', error);
-    }
-
-    // Serve files with proper CORS settings and caching
-    app.use('/uploads', 
-      express.static(uploadsPath, { 
-        setHeaders: (res) => {
-          // Cache images for 30 days
-          res.set('Cache-Control', 'public, max-age=2592000');
-          res.set('Access-Control-Allow-Origin', '*');
-          res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-        }
-      })
-    );
 
     // --- API Routes ---
     app.use('/api/users', userRoutes);

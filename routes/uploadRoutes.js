@@ -5,8 +5,10 @@ import multer from 'multer';
 
 const router = express.Router();
 
-router.post('/', upload.single('file'), async (req, res, next) => { // Make it async
+router.post('/', upload.single('file'), async (req, res, next) => {
+  console.log("=== UPLOAD ROUTE HIT ===");
   console.log("Upload request received. Type:", req.query.type);
+  console.log("File received:", !!req.file);
   
   if (!req.file) {
     console.log('Upload attempt failed: No file received or file rejected early.');
